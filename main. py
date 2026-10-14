@@ -1,0 +1,271 @@
+import pygame
+import random
+import sys
+
+pygame.init()
+
+# Screen settings
+WIDTH = 480
+HEIGHT = 800
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("FX Extreme Racing")
+
+clock = pygame.time.Clock()
+
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (20, 20, 20)
+GRAY = (65, 65, 65)
+GREEN = (25, 140, 50)
+RED = (240, 30, 30)
+BLUE = (30, 130, 255)
+YELLOW = (255, 220, 0)
+
+# Fonts
+font = pygame.font.SysFont(None, 40)
+big_font = pygame.font.SysFont(None, 65)
+
+# Road
+ROAD_LEFT = 70
+ROAD_RIGHT = 410
+ROAD_WIDTH = ROAD_RIGHT - ROAD_LEFT
+
+# Player car
+car_width = 48
+car_height = 85
+player_x = WIDTH // 2 - car_width // 2
+player_y = HEIGHT - 170
+player_speed = 6
+
+# Enemy cars
+enemies = []
+enemy_speed = 5
+spawn_timer = 0
+
+# Game state
+score = 0
+game_over = False
+
+# Touch controls
+left_button = pygame.Rect(30, HEIGHT - 85, 120, 65)
+right_button = pygame.Rect(WIDTH - 150, HEIGHT - 85, 120, 65)
+restart_button = pygame.Rect(100, 420, 280, 70)
+
+def draw_car(x, y, color):
+    pygame.draw.rect(
+        screen, color,
+        (x, y, car_width, car_height),
+        border_radius=10
+    )
+
+    # Windows
+    pygame.draw.rect(
+        screen, (160, 220, 255),
+        (x + 9, y + 12, car_width - 18, 22),
+        border_radius=5
+    )
+
+    pygame.draw.rect(
+        screen, (40, 40, 40),
+        (x + 9, y + 43, car_width - 18, 20),
+        border_radius=4
+    )
+
+    # Headlights
+    pygame.draw.rect(screen, WHITE, (x + 5, y + 4, 9, 7))
+    pygame.draw.rect(
+        screen, WHITE,
+        (x + car_width - 14, y + 4, 9, 7)
+    )
+
+    # Wheels
+    pygame.draw.rect(screen, BLACK, (x - 4, y + 15, 6, 20))
+    pygame.draw.rect(
+        screen, BLACK,
+        (x + car_width - 2, y + 15, 6, 20)
+    )
+    pygame.draw.rect(screen, BLACK, (x - 4, y + 55, 6, 20))
+    pygame.draw.rect(
+        screen, BLACK,
+        (x + car_width - 2, y + 55, 6, 20)
+    )
+
+def draw_text(text, size_font, color, x, y):
+    image = size_font.render(str(text), True, color)
+    screen.blit(image, (x, y))
+
+def reset_game():
+    global player_x, enemies, score
+    global enemy_speed, spawn_timer, game_over
+
+    player_x = WIDTH // 2 - car_width // 2
+    enemies = []
+    score = 0
+    enemy_speed = 5
+    spawn_timer = 0
+    game_over = False
+
+# Main game loop
+running = True
+
+while running:
+    clock.tick(60)
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                running = False
+
+        if event.type == pygame.MOUSEBUTTONDOWN and game_over:
+            if restart_button.collidepoint(event.pos):
+                reset_game()
+
+    keys = pygame.key.get_pressed()
+    mouse_pressed = pygame.mouse.get_pressed()[0]
+    mouse_x, mouse_y = pygame.mouse.get_pos()
+
+    # Background
+    screen.fill(GREEN)
+
+    # Road
+    pygame.draw.rect(
+        screen, GRAY,
+        (ROAD_LEFT, 0, ROAD_WIDTH, HEIGHT)
+    )
+
+    # Road edges
+    pygame.draw.rect(
+        screen, WHITE,
+        (ROAD_LEFT, 0, 6, HEIGHT)
+    )
+    pygame.draw.rect(
+        screen, WHITE,
+        (ROAD_RIGHT - 6, 0, 6, HEIGHT)
+    )
+
+    # Moving lane markings
+    if not game_over:
+        road_offset = (pygame.time.get_ticks() // 5) % 100
+    else:
+        road_offset = 0
+
+    for y in range(-100, HEIGHT, 100):
+        mark_y = (y + road_offset) % (HEIGHT + 100) - 50
+        pygame.draw.rect(
+            screen, YELLOW,
+            (WIDTH // 2 - 4, mark_y, 8, 50)
+        )
+
+    # Touch controls and keyboard controls
+    if not game_over:
+        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+            player_x -= player_speed
+
+        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+            player_x += player_speed
+
+        if mouse_pressed:
+            if left_button.collidepoint(mouse_x, mouse_y):
+                player_x -= player_speed
+
+            if right_button.collidepoint(mouse_x, mouse_y):
+                player_x += player_speed
+
+        player_x = max(
+            ROAD_LEFT + 10,
+            min(ROAD_RIGHT - car_width - 10, player_x)
+        )
+
+        # Spawn enemy cars
+        spawn_timer += 1
+
+        if spawn_timer >= 45:
+            spawn_timer = 0
+
+            enemy_x = random.randint(
+                ROAD_LEFT + 15,
+                ROAD_RIGHT - car_width - 15
+            )
+
+            enemy_color = random.choice([
+                RED, BLUE, YELLOW, WHITE
+            ])
+
+            enemies.append({
+                "x": enemy_x,
+                "y": -car_height,
+                "color": enemy_color
+            })
+
+        # Move enemies and check collisions
+        player_rect = pygame.Rect(
+            player_x + 5, player_y + 5,
+            car_width - 10, car_height - 10
+        )
+
+        for enemy in enemies[:]:
+            enemy["y"] += enemy_speed
+
+            enemy_rect = pygame.Rect(
+                enemy["x"] + 5,
+                enemy["y"] + 5,
+                car_width - 10,
+                car_height - 10
+            )
+
+            if player_rect.colliderect(enemy_rect):
+                game_over = True
+
+            if enemy["y"] > HEIGHT:
+                enemies.remove(enemy)
+                score += 1
+
+        enemy_speed = min(12, 5 + score // 10)
+
+    # Draw cars
+    for enemy in enemies:
+        draw_car(
+            enemy["x"], enemy["y"], enemy["color"]
+        )
+
+    draw_car(player_x, player_y, BLUE)
+
+    # Score
+    draw_text("FX EXTREME", font, YELLOW, 105, 15)
+    draw_text("Score: " + str(score), font, WHITE, 15, 65)
+
+    # Touch buttons
+    pygame.draw.rect(
+        screen, BLUE, left_button, border_radius=12
+    )
+    pygame.draw.rect(
+        screen, BLUE, right_button, border_radius=12
+    )
+
+    draw_text("<", big_font, WHITE, 70, HEIGHT - 80)
+    draw_text(">", big_font, WHITE, WIDTH - 110, HEIGHT - 80)
+
+    # Game over screen
+    if game_over:
+        overlay = pygame.Surface((WIDTH, HEIGHT))
+        overlay.set_alpha(190)
+        overlay.fill(BLACK)
+        screen.blit(overlay, (0, 0))
+
+        draw_text("GAME OVER", big_font, RED, 85, 290)
+        draw_text("Score: " + str(score), font, WHITE, 155, 365)
+
+        pygame.draw.rect(
+            screen, GREEN,
+            restart_button, border_radius=12
+        )
+
+        draw_text("PLAY AGAIN", font, WHITE, 125, 440)
+
+    pygame.display.flip()
+
+pygame.quit()
+sys.exit()
